@@ -18,7 +18,7 @@ fn into_texture(game: SquareGame) -> Vec<u8> {
     let mut data = Vec::with_capacity(game.size * game.size * 4);
     for y in 0..game.size {
         for x in 0..game.size {
-            let background = if x % 2 == 0 || y % 2 == 0 { 0x00 } else { 0xff };
+            let background = if x % 2 == 0 || y % 2 == 0 { 0x60 } else { 0xff };
 
             let cell = game.cell(x, y);
             let is_red = cell == 1.0;
@@ -137,16 +137,7 @@ fn init_window() -> (Window, EventsLoop) {
     (window, events_loop)
 }
 
-pub enum Message {
-    Play(SquareGame),
-    Evolution {
-        generation: usize,
-        agent: usize,
-        game: SquareGame,
-    },
-}
-
-pub fn display_thread(board_size: usize) -> (Sender<Message>, Receiver<(f32, f32)>, JoinHandle<()>) {
+pub fn display_thread(board_size: usize) -> (Sender<SquareGame>, Receiver<(f32, f32)>, JoinHandle<()>) {
     let (in_sender, in_receiver) = channel();
     let (out_sender, out_receiver) = channel();
 
@@ -182,27 +173,10 @@ pub fn display_thread(board_size: usize) -> (Sender<Message>, Receiver<(f32, f32
                 }
             });
 
-            if let Some(msg) = in_receiver.try_iter().last() {
-                let (title, game) = match msg {
-                    Message::Evolution { generation, agent, game } => (
-                        format!(
-                            "Generation {} - Game {} - {} / {}",
-                            generation + 1, agent,
-                            game.score(0), game.score(1)
-                        ),
-                        game,
-                    ),
-                    Message::Play(game) => (
-                        format!(
-                            "{} / {}",
-                            game.score(0), game.score(1)
-                        ),
-                        game,
-                    ),
-                };
-
-                window.set_title(&title);
-                update_tex(state.board_tex, state.edge_size, into_texture(game));
+            if let Some(game) = in_receiver.try_iter().last() {
+                let game: SquareGame = game;
+                window.set_title(&format!("{} / {}", game.score(0), game.score(1)));
+                update_tex(state.board_tex, game.size, into_texture(game));
             }
 
             blit(&state.program, (state.uv_tex, state.board_tex), size);

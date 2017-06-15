@@ -1,12 +1,10 @@
 use std::sync::mpsc::Receiver;
 
-use data;
-use evol::*;
 use game::*;
-use nnet::*;
+use tree::*;
 use display::*;
 
-fn wait_for_turn(game: &mut SquareGame, receiver: &Receiver<(f32, f32)>, board_size: usize) -> bool {
+fn wait_for_player(game: &mut SquareGame, receiver: &Receiver<(f32, f32)>, board_size: usize) -> bool {
     loop {
         if let Ok((x, y)) = receiver.recv() {
             let slices = (5.0 * board_size as f32) + 1.0;
@@ -35,27 +33,26 @@ fn wait_for_turn(game: &mut SquareGame, receiver: &Receiver<(f32, f32)>, board_s
     }
 }
 
-pub fn play(board_size: usize) {
+pub enum GameMode {
+    Autoplay,
+    Game,
+}
+
+pub fn play(board_size: usize, mode: GameMode) {
     let mut game = SquareGame::new(board_size);
     let (sender, receiver, handle) = display_thread(board_size);
 
-    let (_, genomes) = data::load().unwrap();
-    let (data, _) = {
-        genomes.into_iter()
-            .max_by_key(|&(_, score)| score)
-            .unwrap()
-    };
-
-    let agent = Network::from_data(data);
-
     let mut player = 0;
     while !game.remaining.is_empty() {
-        sender.send(Message::Play(game.clone())).expect("send");
+        sender.send(game.clone()).expect("send");
 
         let has_closed = if player == 0 {
-            wait_for_turn(&mut game, &receiver, board_size)
+            match mode {
+                GameMode::Autoplay => play_ia(&mut game, player),
+                GameMode::Game => wait_for_player(&mut game, &receiver, board_size),
+            }
         } else {
-            agent_turn(&mut game, player, &agent)
+            play_ia(&mut game, player)
         };
 
         if !has_closed {
@@ -63,5 +60,6 @@ pub fn play(board_size: usize) {
         }
     }
 
+    sender.send(game.clone()).expect("send");
     handle.join().unwrap();
 }

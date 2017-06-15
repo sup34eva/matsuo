@@ -15,20 +15,19 @@ extern crate serde_derive;
 
 mod render;
 mod display;
-mod nnet;
-mod evol;
 mod game;
-mod data;
 mod play;
+mod tree;
 
 use docopt::Docopt;
+use play::*;
 
 static USAGE: &'static str = "
 Square game with neuroevolution.
 
 Usage:
-  matsuo evolve
-  matsuo play
+  matsuo game
+  matsuo autoplay
   matsuo (-h | --help)
   matsuo --version
 
@@ -40,8 +39,8 @@ Options:
 
 #[derive(Debug, Deserialize)]
 struct Args {
-    cmd_evolve: bool,
-    cmd_play: bool,
+    cmd_game: bool,
+    cmd_autoplay: bool,
     flag_size: usize,
 }
 
@@ -52,11 +51,13 @@ fn main() {
             .unwrap_or_else(|e| e.exit())
     };
 
-    if args.cmd_evolve {
-        evol::evolve(args.flag_size);
-    } else if args.cmd_play {
-        play::play(args.flag_size);
+    let mode = if args.cmd_game {
+        GameMode::Game
+    } else if args.cmd_autoplay {
+        GameMode::Autoplay
     } else {
         panic!("Invalid command")
-    }
+    };
+
+    play(args.flag_size, mode);
 }
